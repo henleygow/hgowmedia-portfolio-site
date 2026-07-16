@@ -1,0 +1,7 @@
+# machine-local Claude Code permissions, not part of the site
+.claude/settings.local.json
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
