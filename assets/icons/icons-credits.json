@@ -1,0 +1,26 @@
+[
+  {
+    "file": "after-effects.svg",
+    "icon": "logos:adobe-after-effects",
+    "name": "After Effects",
+    "kind": "colour",
+    "source": "gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85c",
+    "author": "Gil Barbara",
+    "licence": "CC0-1.0",
+    "url": "https://github.com/gilbarbara/logos",
+    "trademark": true,
+    "markUrl": "https://www.adobe.com/products/aftereffects.html"
+  },
+  {
+    "file": "premiere.svg",
+    "icon": "logos:adobe-premiere",
+    "name": "Premiere Pro",
+    "kind": "colour",
+    "source": "gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85c",
+    "author": "Gil Barbara",
+    "licence": "CC0-1.0",
+    "url": "https://github.com/gilbarbara/logos",
+    "trademark": true,
+    "markUrl": "https://www.adobe.com/products/premiere.html"
+  }
+]

@@ -4,330 +4,362 @@
    ============================================================================ */
 import { profile, projects } from "./data/projects.js";
 
-/* ----------------------------------------------------- timecode helpers */
-const FPS = 24; // sequence frame rate, purely for the cosmetic :FF field
+const $ = (id) => document.getElementById(id);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!reduceMotion) document.documentElement.classList.add("motion"); // styles.css only animates under this
 
-/** "MM:SS" or "H:MM:SS" -> total seconds */
-function durationToSeconds(d) {
-  const parts = String(d).split(":").map(Number);
-  if (parts.some(isNaN)) return 0;
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
 }
 
-/** total seconds -> "HH:MM:SS:FF" timecode */
-function secondsToTimecode(totalSeconds, frames = 0) {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  const ff = String(Math.floor(frames) % FPS).padStart(2, "0");
-  return `${hh}:${mm}:${ss}:${ff}`;
+/* ---------------------------------------------------------------- posters */
+/* The still behind the video view: the data file's thumbnail, else the video
+   host's own (no API key). Resolves to "" when there is none. */
+const posters = new Map();
+function poster(p) {
+  if (!posters.has(p)) posters.set(p, loadPoster(p));
+  return posters.get(p);
 }
-
-/* ---------------------------------------------- generated poster (no image) */
-/* Deterministic gradient + grain so a clip looks intentional before you add art. */
-function generatedPoster(title, index) {
-  const hue = (index * 47 + title.length * 13) % 360;
-  const wrap = document.createElement("div");
-  wrap.className = "gen";
-  wrap.style.background = `radial-gradient(120% 120% at 30% 20%, hsl(${hue} 55% 40%) 0%, hsl(${(hue + 40) % 360} 60% 16%) 55%, #0e0e10 100%)`;
-  return wrap;
-}
-
-/* ============================================================ render: profile */
-function renderProfile() {
-  document.title = `${profile.name} — ${profile.role}`;
-  document.getElementById("brandName").textContent = profile.name;
-  document.getElementById("footerName").textContent = profile.name;
-  document.getElementById("heroRole").textContent = profile.role;
-  document.getElementById("heroLocation").textContent = profile.location;
-  document.getElementById("heroTagline").textContent = profile.tagline;
-
-  // Headline lines (staged for the wipe-in cut)
-  const title = document.getElementById("heroTitle");
-  title.innerHTML = profile.headline
-    .map((line) => `<span class="hero__line"><span>${line}</span></span>`)
-    .join("");
-
-  // About statement (reuse tagline-ish editorial voice)
-  document.getElementById("aboutStatement").textContent =
-    profile.statement ||
-    "I cut for rhythm: the place where a story finds life. Sports, short/long-form, and brand work, shaped frame by frame until every cut earns its place.";
-
-  // Toolkit + services
-  const fill = (id, arr) =>
-    (document.getElementById(id).innerHTML = arr
-      .map((x) => `<li>${x}</li>`)
-      .join(""));
-  fill("toolkitList", profile.toolkit);
-  fill("servicesList", profile.services);
-
-  // Contact
-  const email = document.getElementById("contactEmail");
-  email.textContent = profile.email;
-  email.href = `mailto:${profile.email}`;
-
-  // Contact channels — link out (Instagram) or copy the handle (Discord)
-  const CHANNEL_ICONS = {
-    discord: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.369a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.42 0 1.333-.955 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>`,
-    instagram: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg>`,
-  };
-  const channelsEl = document.getElementById("contactChannels");
-  channelsEl.innerHTML = profile.channels
-    .map((c) => {
-      const icon = CHANNEL_ICONS[c.label.toLowerCase()] || "";
-      const inner = `
-        <span class="channel__lead">
-          <span class="channel__icon">${icon}</span>
-          <span class="channel__main">
-            <span class="channel__label">${c.label}</span>
-            <span class="channel__handle">@${c.handle}</span>
-          </span>
-        </span>
-        <span class="channel__cue">${c.url ? "Open ↗" : "Copy"}</span>`;
-      return c.url
-        ? `<a class="channel" href="${c.url}" target="_blank" rel="noopener">${inner}</a>`
-        : `<button class="channel" type="button" data-copy="${c.copy}">${inner}</button>`;
-    })
-    .join("");
-
-  // Mirror the same channels as mini icons in the top bar
-  document.getElementById("topbarSocials").innerHTML = profile.channels
-    .map((c) => {
-      const icon = CHANNEL_ICONS[c.label.toLowerCase()] || "";
-      const label = `${c.label} · @${c.handle}`;
-      return c.url
-        ? `<a class="topbar__social" href="${c.url}" target="_blank" rel="noopener" title="${label}" aria-label="${label}">${icon}</a>`
-        : `<button class="topbar__social" type="button" data-copy="${c.copy}" title="Copy ${label}" aria-label="Copy ${label}">${icon}</button>`;
-    })
-    .join("");
-
-  // Copy-to-clipboard for any channel/social with data-copy (contact + top bar)
-  document.querySelectorAll("[data-copy]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const cue = btn.querySelector(".channel__cue"); // only the contact rows have one
-      try {
-        await navigator.clipboard.writeText(btn.dataset.copy);
-        if (cue) cue.textContent = "Copied ✓";
-        showToast(`Copied @${btn.dataset.copy} to clipboard`);
-      } catch {
-        if (cue) cue.textContent = `@${btn.dataset.copy}`; // clipboard blocked — show it to copy manually
-        showToast(`Copy manually: @${btn.dataset.copy}`);
-      }
-      btn.classList.add("is-copied");
-      setTimeout(() => {
-        if (cue) cue.textContent = "Copy";
-        btn.classList.remove("is-copied");
-      }, 1800);
-    });
-  });
-}
-
-/* ----------------------------------------------------- toast (copy feedback) */
-function showToast(msg) {
-  let el = document.getElementById("toast");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "toast";
-    el.className = "toast";
-    el.setAttribute("role", "status");
-    el.setAttribute("aria-live", "polite");
-    document.body.appendChild(el);
+async function loadPoster(p) {
+  if (p.thumbnail) return p.thumbnail;
+  const v = p.video;
+  if (v?.type === "youtube") return `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`;
+  if (v?.type === "vimeo") {
+    try {
+      const r = await fetch(`https://vimeo.com/api/oembed.json?width=1280&url=https://vimeo.com/${v.id}`);
+      if (r.ok) return (await r.json()).thumbnail_url || "";
+    } catch {}
   }
-  el.textContent = msg;
-  el.classList.add("is-visible");
-  clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => el.classList.remove("is-visible"), 2200);
-}
-
-/* ------------------------------------------------- vimeo thumbnail (oEmbed) */
-/* Public, no API key. Fails silently → the generated poster stays. */
-async function vimeoPoster(id, title, posterEl) {
-  try {
-    const r = await fetch(
-      `https://vimeo.com/api/oembed.json?width=1280&url=https://vimeo.com/${id}`,
-    );
-    if (!r.ok) return;
-    const { thumbnail_url } = await r.json();
-    if (!thumbnail_url) return;
-    const img = new Image();
-    img.alt = `${title} poster`;
-    img.decoding = "async";
-    // swap on load, so a poster that never arrives leaves the placeholder alone
-    img.onload = () => posterEl.querySelector(".gen")?.replaceWith(img);
-    img.src = thumbnail_url;
-  } catch {}
-}
-
-/* ============================================================ render: clips */
-function renderClips() {
-  const list = document.getElementById("clips");
-  let cumulative = 0; // running in-point of the whole sequence
-
-  projects.forEach((p, i) => {
-    const inPoint = secondsToTimecode(cumulative);
-    const li = document.createElement("li");
-    li.className = "clip reveal";
-    li.tabIndex = 0;
-    li.setAttribute("role", "button");
-    li.setAttribute("aria-label", `Play ${p.title}`);
-
-    const posterImg = p.thumbnail
-      ? `<img src="${p.thumbnail}" alt="${p.title} poster" loading="lazy" />`
-      : "";
-
-    li.innerHTML = `
-      <span class="clip__tc">${inPoint}</span>
-      <div class="clip__poster">
-        ${posterImg}
-        <div class="clip__play"><span></span></div>
-      </div>
-      <div class="clip__body">
-        <h3 class="clip__title">${p.title}</h3>
-        <div class="clip__tags">${(p.tags || []).map((t) => `<span class="clip__tag">${t}</span>`).join("")}</div>
-      </div>
-      <div class="clip__rail">
-        <span class="clip__arrow">↗</span>
-      </div>
-    `;
-
-    // generated poster fallback — Vimeo's own thumbnail layers over it if it loads
-    if (!p.thumbnail) {
-      const poster = li.querySelector(".clip__poster");
-      poster.prepend(generatedPoster(p.title, i));
-      if (p.video?.type === "vimeo") vimeoPoster(p.video.id, p.title, poster);
-    }
-
-    // open player
-    const open = () => p.video && openPlayer(p);
-    li.addEventListener("click", open);
-    li.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        open();
-      }
-    });
-    if (!p.video) {
-      li.style.cursor = "default";
-      li.removeAttribute("role");
-    }
-
-    list.appendChild(li);
-    cumulative += durationToSeconds(p.duration);
-  });
-
-  // totals
-  const total = secondsToTimecode(cumulative);
-  document.getElementById("totalRuntime").textContent = total;
-  document.getElementById("footerTc").textContent = total;
-}
-
-/* ============================================================ player modal */
-const player = document.getElementById("player");
-const playerFrame = document.getElementById("playerFrame");
-let lastFocused = null;
-
-function videoEmbed(v) {
-  if (!v) return "";
-  if (v.type === "vimeo")
-    return `<iframe src="https://player.vimeo.com/video/${v.id}?autoplay=1&title=0&byline=0&portrait=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
-  if (v.type === "youtube")
-    return `<iframe src="https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
-  if (v.type === "mp4")
-    return `<video src="${v.src}" controls autoplay playsinline></video>`;
   return "";
 }
+/* ----------------------------------------------------------------- player */
+/* A full-screen view: the video at its own shape over a blurred still of itself. */
+const player = $("player");
+const playerFrame = $("playerFrame");
 
-function openPlayer(p) {
-  lastFocused = document.activeElement;
-  document.getElementById("playerTitle").textContent = p.title;
-  playerFrame.innerHTML = videoEmbed(p.video);
-  player.hidden = false;
-  document.body.style.overflow = "hidden";
-  document.getElementById("playerClose").focus();
-}
+const watchUrl = (v) =>
+  ({ vimeo: `https://vimeo.com/${v.id}`, youtube: `https://youtu.be/${v.id}`, mp4: v.src })[v.type];
 
-function closePlayer() {
-  player.hidden = true;
-  playerFrame.innerHTML = ""; // stop playback
-  document.body.style.overflow = "";
-  if (lastFocused) lastFocused.focus();
-}
-
-player.addEventListener("click", (e) => {
-  if (e.target.hasAttribute("data-close")) closePlayer();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !player.hidden) closePlayer();
-});
-
-/* ============================================ scroll-scrub: page as sequence */
-const hudTc = document.getElementById("hudTimecode");
-const scrubFill = document.getElementById("scrubFill");
-const scrubHead = document.getElementById("scrubHead");
-let totalSeq = 0;
-let ticking = false;
-
-function initSequenceLength() {
-  totalSeq = projects.reduce(
-    (acc, p) => acc + durationToSeconds(p.duration),
-    0,
-  );
-}
-
-function onScroll() {
-  const doc = document.documentElement;
-  const max = doc.scrollHeight - doc.clientHeight;
-  const pct = max > 0 ? Math.min(1, window.scrollY / max) : 0;
-
-  // map scroll position onto total sequence runtime -> live timecode
-  const seconds = pct * totalSeq;
-  const frames = (pct * totalSeq * FPS) % FPS;
-  hudTc.textContent = secondsToTimecode(seconds, frames);
-
-  // hero scrubber
-  scrubFill.style.width = `${(pct * 100).toFixed(2)}%`;
-  scrubHead.style.left = `${(pct * 100).toFixed(2)}%`;
-
-  ticking = false;
-}
-
-window.addEventListener(
-  "scroll",
-  () => {
-    if (!ticking) {
-      requestAnimationFrame(onScroll);
-      ticking = true;
-    }
-  },
-  { passive: true },
-);
-
-/* ============================================ scroll reveal (IntersectionObserver) */
-function initReveal() {
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const els = document.querySelectorAll(".reveal");
-  if (reduce || !("IntersectionObserver" in window)) {
-    els.forEach((el) => el.classList.add("is-in"));
-    return;
+function embed(p) {
+  const v = p.video;
+  if (v.type === "mp4") {
+    const video = el("video", { src: v.src, controls: true, autoplay: true, playsInline: true, preload: "auto" });
+    // the stage takes the video's own shape, so nothing is letterboxed
+    video.addEventListener("loadedmetadata", () => {
+      playerFrame.style.setProperty("--ar", video.videoWidth / video.videoHeight);
+      video.classList.add("is-ready");
+    });
+    return video;
   }
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-in");
-          io.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.15, rootMargin: "0px 0px -8% 0px" },
-  );
-  els.forEach((el) => io.observe(el));
+  const src =
+    v.type === "vimeo"
+      ? `https://player.vimeo.com/video/${v.id}?autoplay=1&title=0&byline=0&portrait=0`
+      : `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+  return el("iframe", { className: "is-ready", src, title: p.title, allow: "autoplay; fullscreen; picture-in-picture" });
 }
 
-/* ===================================================================== boot */
+async function openPlayer(p) {
+  $("playerTitle").textContent = p.title;
+  $("playerBlurb").textContent = p.blurb || "";
+  $("playerBackdrop").src = await poster(p);
+  playerFrame.replaceChildren(embed(p));
+  player.showModal();
+  history.pushState({ viewer: true }, ""); // so the phone's Back button closes the view
+}
+player.addEventListener("close", () => {
+  playerFrame.replaceChildren(); // stops playback
+  playerFrame.style.removeProperty("--ar");
+  if (history.state?.viewer) history.back();
+});
+addEventListener("popstate", () => player.open && player.close());
+
+/* A real link to the video (so new-tab clicks work); a plain click plays it here. */
+function playLink(p, props, ...children) {
+  if (!p.video) return el("div", props, ...children);
+  const a = el("a", { ...props, href: watchUrl(p.video) }, ...children);
+  a.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    openPlayer(p);
+  });
+  return a;
+}
+
+/* ---------------------------------------------------------------- profile */
+function renderProfile() {
+  const firstName = profile.name.split(" ")[0];
+  document.querySelectorAll("[data-name]").forEach((n) => (n.textContent = profile.name));
+  document.querySelectorAll("[data-first-name]").forEach((n) => (n.textContent = firstName));
+  document.querySelectorAll("[data-email-link]").forEach((a) => {
+    a.href = `mailto:${profile.email}`;
+    a.textContent = `Email ${firstName}`;
+  });
+
+  $("aboutStatement").textContent = profile.statement;
+  $("aboutBlurb").textContent = profile.blurb;
+  const fill = (id, items) => $(id).replaceChildren(...items.map((x) => el("li", {}, x)));
+  fill("servicesList", profile.services);
+  fill("toolkitList", profile.toolkit);
+
+  if (profile.portrait) {
+    // shown once the file loads, so a path with no photo behind it yet leaves About text-only
+    const photo = $("portrait");
+    photo.onload = () => (photo.hidden = false);
+    Object.assign(photo, { src: profile.portrait, alt: `Portrait of ${profile.name}`, loading: "eager" });
+  }
+
+  $("legal").textContent = `© ${new Date().getFullYear()} ${profile.name}`;
+}
+
+/* --------------------------------------------------------------- channels */
+/* `url` opens in a new tab; anything else copies its handle to the clipboard. */
+function renderChannels() {
+  const rows = [{ label: "Email", handle: profile.email, copy: profile.email }, ...profile.channels];
+  $("channels").replaceChildren(
+    ...rows.map((c) => {
+      const cue = el("span", { className: "channel__cue" }, c.url ? "Open" : "Copy");
+      const inner = [
+        el("span", { className: "channel__label" }, c.label),
+        el("span", { className: "channel__handle", translate: false }, c.label === "Email" ? c.handle : `@${c.handle}`),
+        cue,
+      ];
+      if (c.url) return el("li", {}, el("a", { className: "channel", href: c.url, target: "_blank", rel: "noopener" }, ...inner));
+
+      cue.setAttribute("aria-live", "polite");
+      const btn = el("button", { className: "channel", type: "button" }, ...inner);
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(c.copy);
+          cue.textContent = "Copied";
+        } catch {
+          cue.textContent = "Select to copy"; // clipboard blocked: the handle is on screen
+        }
+        setTimeout(() => (cue.textContent = "Copy"), 1800);
+      });
+      return el("li", {}, btn);
+    }),
+  );
+}
+
+/* ------------------------------------------------------------------- work */
+/* A list, not a wall of thumbnails: number, title, tags, running time. */
+function renderWork() {
+  $("workList").replaceChildren(
+    ...projects.map((p, i) => {
+      const row = playLink(
+        p,
+        { className: "row" },
+        el("span", { className: "row__n" }, String(i + 1).padStart(2, "0")),
+        el("h3", { className: "row__title" }, p.title),
+        el("span", { className: "row__tags" }, (p.tags || []).join(" · ")),
+        el("span", { className: "row__time" }, p.duration || ""),
+      );
+      row.dataset.preview = p.preview || "";
+      const li = el("li", {}, row);
+      li.dataset.reveal = "";
+      li.style.setProperty("--d", `${i * 50}ms`); // rows follow one another in
+      return li;
+    }),
+  );
+}
+
+/* ------------------------------------------------------------------- peek */
+/* After the taste skill's "peek-list": hovering a row plays a few silent seconds of that
+   edit beside the pointer. Mouse only; nothing loads until a row is hovered. */
+function peekOnHover() {
+  if (reduceMotion || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const list = $("workList");
+  const peek = $("peek");
+  const video = peek.querySelector("video");
+  let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+  const tick = () => {
+    raf = 0;
+    cx += (tx - cx) * 0.18;
+    cy += (ty - cy) * 0.18;
+    peek.style.translate = `${cx.toFixed(1)}px ${cy.toFixed(1)}px`;
+    if (Math.abs(tx - cx) + Math.abs(ty - cy) > 0.5) raf = requestAnimationFrame(tick);
+  };
+  list.addEventListener("pointermove", (e) => {
+    // below and right of the pointer, flipped where it would leave the window
+    const w = peek.offsetWidth || 340, h = peek.offsetHeight || 190;
+    tx = e.clientX + 28 + w > innerWidth ? e.clientX - 28 - w : e.clientX + 28;
+    ty = Math.min(e.clientY + 28, innerHeight - h - 16);
+    if (!peek.classList.contains("is-on")) [cx, cy] = [tx, ty]; // appear in place, then follow
+    raf ||= requestAnimationFrame(tick);
+  }, { passive: true });
+  list.addEventListener("pointerover", (e) => {
+    const src = e.target.closest(".row")?.dataset.preview;
+    if (!src) return peek.classList.remove("is-on");
+    if (video.getAttribute("src") !== src) video.src = src;
+    video.play().catch(() => {});
+    peek.classList.add("is-on");
+  });
+  const hide = () => {
+    peek.classList.remove("is-on");
+    video.pause();
+  };
+  list.addEventListener("pointerleave", hide);
+  list.addEventListener("click", hide); // the video view is opening
+}
+
+/* ------------------------------------------------------------- hero facts */
+/* The rule and short facts above the name; a fact may show real app icons before its words. */
+function renderFacts() {
+  $("heroFacts").replaceChildren(
+    ...(profile.facts || []).map((f, n) => {
+      const icons = (f.icons || []).map((i) =>
+        el("img", { className: "fact__icon", src: i.src, alt: i.name, title: i.name, width: 28, height: 28 }));
+      const fact = el("div", {}, el("dt", {}, f.label), el("dd", {}, ...icons, f.value || ""));
+      fact.style.setProperty("--i", n); // staggers the entrance
+      return fact;
+    }),
+  );
+}
+
+/* ----------------------------------------------------------- pointer light */
+/* After the taste skill's "cursor-spotlight": the light follows the pointer with a short
+   lag and drifts back to its resting spot when the pointer leaves. On touch screens and
+   under reduced motion it simply rests there. */
+function pointerLight(hero, grain) {
+  const rest = [0.76, 0.4];
+  const light = el("div", { className: "hero__light" });
+  light.setAttribute("aria-hidden", "true");
+  light.style.setProperty("--grain", grain);
+  hero.querySelector(".hero__fx").after(light);
+  if (reduceMotion || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+  let [tx, ty] = rest, cx = tx, cy = ty, raf = 0;
+  const tick = () => {
+    raf = 0;
+    cx += (tx - cx) * 0.14;
+    cy += (ty - cy) * 0.14;
+    hero.style.setProperty("--lx", `${(cx * 100).toFixed(2)}%`);
+    hero.style.setProperty("--ly", `${(cy * 100).toFixed(2)}%`);
+    if (Math.abs(tx - cx) + Math.abs(ty - cy) > 0.001) raf = requestAnimationFrame(tick);
+  };
+  const aim = (x, y) => {
+    [tx, ty] = [x, y];
+    raf ||= requestAnimationFrame(tick);
+  };
+  hero.addEventListener("pointermove", (e) => {
+    const r = light.getBoundingClientRect();
+    aim((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  }, { passive: true });
+  hero.addEventListener("pointerleave", () => aim(...rest));
+}
+
+/* ------------------------------------------------------------- hero video */
+/* A muted loop behind the name, kept light: the poster shows first and the file is only
+   fetched once the page has loaded; phones held upright get the smaller portrait crop;
+   it stops when scrolled away, when the tab is hidden and while a project plays; and visitors on Save-Data, a 2G link
+   or reduced motion get the poster until they press Play. */
+function heroVideo(hero) {
+  const upright = profile.heroVideoPortrait && matchMedia("(orientation: portrait)").matches;
+  const src = upright ? profile.heroVideoPortrait : profile.heroVideo;
+  const video = el("video", {
+    className: "hero__video", poster: profile.heroPoster || "",
+    muted: true, loop: true, playsInline: true, preload: "none", tabIndex: -1, disablePictureInPicture: true,
+  });
+  video.setAttribute("aria-hidden", "true");
+  hero.classList.add("hero--video");
+  hero.prepend(video);
+
+  const link = navigator.connection;
+  const startPaused = reduceMotion || Boolean(link?.saveData) || /2g/.test(link?.effectiveType || "");
+  let wanted = !startPaused, onScreen = true;
+  const sync = () => {
+    if (!(wanted && onScreen) || document.hidden || player.open) return video.pause();
+    video.src ||= src; // the first play is what fetches the file
+    video.play().catch(() => {}); // autoplay refused (e.g. low-power mode): the poster stays
+  };
+  new IntersectionObserver(([entry]) => {
+    onScreen = entry.isIntersecting;
+    sync();
+  }).observe(hero);
+  document.addEventListener("visibilitychange", sync);
+  new MutationObserver(sync).observe(player, { attributeFilter: ["open"] }); // rests while a project plays
+  if (document.readyState === "complete") sync();
+  else addEventListener("load", sync, { once: true });
+
+  const set = (on) => {
+    wanted = on;
+    sync();
+  };
+  return { startPaused, pause: () => set(false), resume: () => set(true) };
+}
+
+/* ------------------------------------------------------------------- hero */
+/* The ground under the name: the video when profile.heroVideo is set, else the
+   light-leak effect (WebGL; it falls back to a still by itself). */
+async function renderHero() {
+  const hero = $("hero");
+  const pause = $("heroPause");
+  let motion = null; // { pause(), resume(), startPaused? } once something can move
+
+  if (profile.heroVideo) {
+    motion = heroVideo(hero);
+  } else {
+    const ground = el("div", { className: "hero__fx" });
+    ground.setAttribute("aria-hidden", "true");
+    hero.prepend(ground);
+    try {
+      const { default: fx, grainCSS } = await import("./assets/effects/fx.js");
+      pointerLight(hero, grainCSS(0.1));
+      // edge 2 = light from the top, away from the name; calm keeps the name's area quiet
+      const leak = await fx.mount(ground, "film-light-leak", {
+        seed: 7,
+        params: { edge: 2, intensity: 0.9, spread: 0.55, grain: 0.06, breathe: 7, calmX: 0.4, calmY: 0.75 },
+      });
+      if (!reduceMotion && !ground.dataset.fxFallback) motion = leak;
+    } catch {} // no effect: the hero is the name on the dark ground
+  }
+  if (!motion) return; // nothing moves, so there is nothing to pause
+
+  let paused = false;
+  const setPaused = (next) => {
+    paused = next;
+    pause.textContent = paused ? "Play motion" : "Pause motion";
+    paused ? motion.pause() : motion.resume();
+  };
+  pause.hidden = false;
+  if (motion.startPaused) setPaused(true);
+  pause.addEventListener("click", () => setPaused(!paused));
+}
+
+/* --------------------------------------------------------------- the name */
+/* The name is sized to span the page exactly: measure its width in ems and hand it to the
+   CSS, again whenever a font finishes loading (a fallback face has a different width). */
+function fitName() {
+  const name = document.querySelector(".hero__name");
+  const range = document.createRange();
+  range.selectNodeContents(name);
+  const em = range.getBoundingClientRect().width / parseFloat(getComputedStyle(name).fontSize);
+  if (em > 0) document.documentElement.style.setProperty("--name-em", (em * 1.004).toFixed(4));
+}
+
+/* ---------------------------------------------------------------- reveals */
+/* Each [data-reveal] block eases in once, the first time it scrolls into view. */
+function revealOnScroll() {
+  const blocks = document.querySelectorAll("[data-reveal]");
+  if (reduceMotion) return;
+  const seen = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      entry.target.classList.add("is-in");
+      seen.unobserve(entry.target);
+    }
+  }, { rootMargin: "0px 0px -8% 0px" });
+  blocks.forEach((b) => seen.observe(b));
+}
+
 renderProfile();
-renderClips();
-initSequenceLength();
-initReveal();
-onScroll();
+renderChannels();
+renderWork();
+renderFacts();
+renderHero();
+peekOnHover();
+revealOnScroll();
+fitName();
+document.fonts.addEventListener("loadingdone", fitName);

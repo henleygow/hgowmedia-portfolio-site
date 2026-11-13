@@ -5,3 +5,7 @@
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# taste-skill build state and check screenshots
+.taste-skill/
+shots/

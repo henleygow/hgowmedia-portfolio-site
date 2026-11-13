@@ -2,172 +2,126 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Henley — Video Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Title, description and share text live here; everything else is in data/projects.js -->
+    <title>Henley Gow: video editor for brands, sports and social</title>
     <meta
       name="description"
-      content="Henley. CT/NY based video editor creating sports, brand, and social media creatives for rhythm and feeling."
+      content="Henley Gow edits short-form ads, sports edits, real estate and brand films. Based in Connecticut, available remote worldwide."
     />
+    <meta property="og:title" content="Henley Gow: video editor for brands, sports and social" />
+    <meta
+      property="og:description"
+      content="Short-form ads, sports edits, real estate and brand films, with color and sound finished in the same pass."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Once the site has a domain: add og:image (a full https URL to a 1200x630 still) and link rel="canonical" -->
+    <meta name="theme-color" content="#0e0e0d" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600&family=Archivo+Expanded:wght@600;700;800;900&family=Hanken+Grotesk:wght@400;500;600&family=Martian+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112..125,500..600&family=Rethink+Sans:wght@400..700&display=swap"
       rel="stylesheet"
     />
-
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <!-- Vectorscope color field: slow-drifting R/G/B blooms behind the UI -->
-    <div class="backdrop" aria-hidden="true">
-      <span class="backdrop__bloom backdrop__bloom--r"></span>
-      <span class="backdrop__bloom backdrop__bloom--g"></span>
-      <span class="backdrop__bloom backdrop__bloom--b"></span>
-      <span class="backdrop__vignette"></span>
-    </div>
-
-    <!-- Grain / scanline atmosphere overlay (purely decorative) -->
-    <div class="grain" aria-hidden="true"></div>
-
-    <!-- Fixed playhead HUD: the page is a sequence; this is your position in it -->
-    <div class="hud" aria-hidden="true">
-      <span class="hud__tally"></span>
-      <span class="hud__label">PLAYHEAD</span>
-      <span class="hud__tc" id="hudTimecode">00:00:00:00</span>
-    </div>
-
-    <!-- Top bar -->
-    <header class="topbar">
-      <a href="#top" class="topbar__brand">
-        <span class="topbar__rec"></span>
-        <span id="brandName">Henley</span>
-      </a>
-      <nav class="topbar__nav" aria-label="Primary">
-        <a href="#sequence">Work</a>
-        <a href="#about">About</a>
-        <a href="#contact">Contact</a>
-        <span class="topbar__socials" id="topbarSocials"></span>
-      </nav>
+    <header class="nav">
+      <div class="wrap">
+        <a class="skip" href="#top">Skip to content</a>
+        <a class="brand" href="#top" translate="no">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="6.5" cy="6.5" r="4.5" />
+            <circle cx="17.5" cy="6.5" r="4.5" />
+            <circle cx="6.5" cy="17.5" r="4.5" />
+            <rect class="mark__accent" x="13" y="13" width="9" height="9" rx="1.5" />
+          </svg>
+          <span data-name></span>
+        </a>
+        <nav class="nav__links" aria-label="Primary">
+          <a href="#work">Work</a>
+          <a href="#about">About</a>
+          <a href="#contact">Contact</a>
+        </nav>
+        <a class="btn btn--primary" data-email-link href="#contact">Email me</a>
+      </div>
     </header>
 
     <main id="top">
-      <!-- ===================== HERO / PROGRAM MONITOR ===================== -->
+      <!-- HERO: the name over a moving ground (the light-leak effect, or the reel when profile.heroVideo is set) -->
       <section class="hero" id="hero">
-        <div class="hero__meta">
-          <span class="hero__metaItem" id="heroRole">Video Editor</span>
-          <span class="hero__metaItem" id="heroLocation"
-            >Available worldwide</span
-          >
-        </div>
-
-        <h1
-          class="hero__title"
-          id="heroTitle"
-          aria-label="The cut is the story."
-        >
-          <!-- lines injected by JS so the wipe-in cut can be staged -->
-        </h1>
-
-        <p class="hero__tagline" id="heroTagline"></p>
-
-        <div class="hero__actions">
-          <a class="btn btn--solid" href="#sequence">
-            <span class="btn__play" aria-hidden="true"></span> See selected work
-          </a>
-          <a class="btn btn--ghost" href="#contact">Get in touch</a>
-        </div>
-
-        <!-- The scrubber: a real-feeling timeline the page rides on -->
-        <div class="scrubber" aria-hidden="true">
-          <div class="scrubber__track">
-            <div class="scrubber__fill" id="scrubFill"></div>
-            <div class="scrubber__head" id="scrubHead"></div>
-          </div>
-          <div class="scrubber__hint">
-            SCROLL TO SCRUB <span class="scrubber__arrow">↓</span>
+        <div class="wrap hero__inner">
+          <dl class="hero__facts" id="heroFacts"></dl>
+          <h1 class="hero__name" translate="no" data-name></h1>
+          <div class="hero__controls" id="heroControls">
+            <button class="hero__ctl" id="heroPause" type="button" hidden>Pause motion</button>
           </div>
         </div>
       </section>
 
-      <!-- ========================= THE SEQUENCE ========================= -->
-      <section class="sequence" id="sequence">
-        <div class="sectionhead">
-          <span class="sectionhead__eyebrow">Portfolio</span>
-          <h2 class="sectionhead__title">Selected Work</h2>
-        </div>
-
-        <!-- Clips injected here from data/projects.js -->
-        <ol class="clips" id="clips"></ol>
-
-        <div class="sequence__end">
-          <span class="sequence__endline"></span>
-          <span class="sequence__endlabel">END OF SEQUENCE</span>
-          <span class="sequence__endtc" id="totalRuntime">00:00:00:00</span>
+      <section class="section" id="work">
+        <div class="wrap">
+          <h2 data-reveal>Selected work</h2>
+          <ul class="work-list" id="workList"></ul>
         </div>
       </section>
 
-      <!-- ============================ ABOUT ============================ -->
-      <section class="about" id="about">
-        <div class="about__lead">
-          <span class="sectionhead__eyebrow">Editor's note</span>
-          <p class="about__statement" id="aboutStatement"></p>
-        </div>
-        <div class="about__cols">
-          <div class="about__col">
-            <h3 class="about__colTitle">Toolkit</h3>
-            <ul class="taglist" id="toolkitList"></ul>
+      <section class="section" id="about">
+        <div class="wrap about">
+          <div class="about__text" data-reveal>
+            <h2>About <span data-first-name></span></h2>
+            <p class="statement" id="aboutStatement"></p>
+            <p class="about__blurb" id="aboutBlurb"></p>
           </div>
-          <div class="about__col">
-            <h3 class="about__colTitle">What I cut</h3>
-            <ul class="taglist" id="servicesList"></ul>
+          <div class="about__lists" data-reveal style="--d: 120ms">
+            <div>
+              <h3>What I cut</h3>
+              <ul class="plain-list" id="servicesList"></ul>
+            </div>
+            <div>
+              <h3>Toolkit</h3>
+              <ul class="plain-list" id="toolkitList"></ul>
+            </div>
           </div>
+          <!-- Portrait slot: set profile.portrait in data/projects.js -->
+          <img class="about__photo" id="portrait" alt="" width="1000" height="1250" loading="lazy" hidden />
         </div>
       </section>
-
-      <!-- =========================== CONTACT =========================== -->
-      <footer class="contact" id="contact">
-        <span class="sectionhead__eyebrow">Contact</span>
-        <a class="contact__email" id="contactEmail" href="#"
-          >email@example.com</a
-        >
-        <div class="contact__channels" id="contactChannels"></div>
-        <div class="contact__base">
-          <span id="footerName">Henley</span> · Video Editor
-          <span class="contact__sep">/</span>
-          <span class="contact__tc" id="footerTc">00:00:00:00</span>
-        </div>
-      </footer>
     </main>
 
-    <!-- ============================ PLAYER MODAL ============================ -->
-    <div
-      class="player"
-      id="player"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Video player"
-      hidden
-    >
-      <div class="player__backdrop" data-close></div>
-      <div class="player__shell" role="document">
-        <div class="player__bar">
-          <span class="player__tally"></span>
-          <span class="player__title" id="playerTitle">—</span>
-          <button
-            class="player__close"
-            id="playerClose"
-            data-close
-            aria-label="Close player"
-          >
-            CLOSE ✕
-          </button>
+    <footer class="closing" id="contact">
+      <div class="wrap">
+        <div class="close">
+          <div class="close__lead" data-reveal>
+            <h2>Contact</h2>
+            <p class="close__line">Email me about a project. Discord and Instagram work too.</p>
+            <a class="btn btn--primary btn--xl" data-email-link href="#contact">Email me</a>
+          </div>
+          <ul class="channels" id="channels" data-reveal style="--d: 120ms"></ul>
         </div>
-        <div class="player__frame" id="playerFrame">
-          <!-- iframe / video injected -->
-        </div>
+        <p class="legal"><span id="legal"></span> · Product names and logos are trademarks of their owners.</p>
+        <p class="wordmark" aria-hidden="true" translate="no" data-name></p>
       </div>
+    </footer>
+
+    <!-- A few silent seconds of the hovered project, beside the pointer (desktop only) -->
+    <div class="peek" id="peek" aria-hidden="true">
+      <video muted loop playsinline preload="none" tabindex="-1"></video>
     </div>
+
+    <!-- The video view: fills the screen, the video at its own shape over a blurred still -->
+    <dialog class="viewer" id="player" aria-labelledby="playerTitle">
+      <img class="viewer__backdrop" id="playerBackdrop" alt="" />
+      <form class="viewer__bar" method="dialog">
+        <p class="viewer__title" id="playerTitle"></p>
+        <button class="link" type="submit">Close</button>
+      </form>
+      <div class="viewer__stage" id="playerFrame"></div>
+      <p class="viewer__blurb" id="playerBlurb"></p>
+    </dialog>
 
     <script type="module" src="main.js"></script>
   </body>
